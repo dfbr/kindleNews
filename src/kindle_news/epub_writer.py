@@ -21,24 +21,24 @@ def build_epub(digest: WeeklyDigest, output_path: Path) -> Path:
 
     cover_image_src: str | None = None
     cover_image_note: str | None = None
-    cover_story = _pick_cover_story(digest)
-    if cover_story and cover_story.image_url:
-        cover_asset = _download_image_asset(cover_story.image_url, "cover")
-        if cover_asset:
-            filename, content, media_type = cover_asset
-            cover_item = epub.EpubItem(
-                uid="cover-page-image",
-                file_name=f"images/{filename}",
-                media_type=media_type,
-                content=content,
-            )
-            book.add_item(cover_item)
-            cover_image_src = f"images/{filename}"
-            cover_image_note = _build_cover_image_note(cover_story)
+    cover_asset, cover_story = _select_cover_asset(digest)
+    if cover_asset:
+        filename, content, media_type = cover_asset
+        cover_item = epub.EpubItem(
+            uid="cover-page-image",
+            file_name=f"images/{filename}",
+            media_type=media_type,
+            content=content,
+        )
+        book.add_item(cover_item)
+        cover_image_src = f"images/{filename}"
+        cover_image_note = _build_cover_image_note(cover_story)
+        # Set EPUB-level cover metadata so e-readers can render library thumbnails.
+        book.set_cover(filename, content)
 
     coverage_range = _coverage_date_range(digest)
     cover_title = f"Weekly news digest {coverage_range}"
-    cover_page = epub.EpubHtml(title="Cover", file_name="cover.xhtml", lang="en")
+    cover_page = epub.EpubHtml(title="Cover", file_name="front_cover.xhtml", lang="en")
     cover_page.content = _build_cover_page_html(cover_title, cover_image_src, cover_image_note)
 
     chapters = [cover_page]
@@ -90,6 +90,22 @@ def _pick_cover_story(digest: WeeklyDigest) -> Story | None:
     return None
 
 
+def _select_cover_asset(
+    digest: WeeklyDigest,
+) -> tuple[tuple[str, bytes, str] | None, Story | None]:
+    # Prefer a successfully downloaded image from chosen stories.
+    for story in digest.stories:
+        if not story.image_url:
+            continue
+        asset = _download_image_asset(story.image_url, "cover")
+        if asset:
+            return asset, story
+
+    # If no remote image is available, fall back to a local bundled asset.
+    fallback_asset = _load_local_cover_fallback("cover")
+    return fallback_asset, None
+
+
 def _download_image_asset(url: str, stem: str) -> tuple[str, bytes, str] | None:
     try:
         response = requests.get(url, timeout=20)
@@ -128,9 +144,22 @@ def _coverage_date_range(digest: WeeklyDigest) -> str:
     return f"{first} - {last}"
 
 
-def _build_cover_image_note(story: Story) -> str:
+def _build_cover_image_note(story: Story | None) -> str:
+    if story is None:
+        return "Cover image: default fallback artwork."
     image_what = story.image_credit.strip() if story.image_credit else "Lead image"
     return f"{image_what}. From: {story.title}."
+
+
+def _load_local_cover_fallback(stem: str) -> tuple[str, bytes, str] | None:
+    fallback_path = Path(__file__).resolve().parents[2] / "config" / "fallback_cover.svg"
+    if not fallback_path.exists():
+        return None
+
+    content = fallback_path.read_bytes()
+    suffix = fallback_path.suffix.lower() or ".svg"
+    media_type = mimetypes.guess_type(f"asset{suffix}")[0] or "image/svg+xml"
+    return f"{stem}{suffix}", content, media_type
 
 
 def _source_label(source: str) -> str:

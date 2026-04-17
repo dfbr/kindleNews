@@ -85,6 +85,9 @@ Phase 2:
 - Add weekly cache health checks and feed coverage gate artifacts.
 - Optional: keep a short archive of prior-week cache manifests.
 
+## Future Features
+- Group stories into explicit editorial sections in the EPUB (for example Tech Business, UK Politics, Norway Politics, Science, Culture), implemented via ranking schema updates, prompt taxonomy, and section-aware rendering.
+
 ## Risks and Mitigations
 - Risk: cache growth if cleanup is skipped.
   - Mitigation: weekly clear on success and explicit clear metadata artifact.
