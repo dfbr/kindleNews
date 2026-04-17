@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import io
 import mimetypes
 from datetime import datetime
 from html import escape
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import requests
 from ebooklib import epub
+from PIL import Image, ImageDraw, ImageFont
 
 from .models import Story, WeeklyDigest
 
@@ -19,47 +22,30 @@ def build_epub(digest: WeeklyDigest, output_path: Path) -> Path:
     book.set_title(digest.title)
     book.set_language("en")
 
-    cover_image_src: str | None = None
-    cover_image_note: str | None = None
     coverage_range = _coverage_date_range(digest)
-    cover_title = f"Weekly news digest {coverage_range}"
+    cover_label = "Weekly news digest"
 
-    cover_thumbnail = _build_cover_thumbnail_svg(cover_title)
-    # This metadata cover is what many readers (including Kindle library view)
-    # use for thumbnails, so it must include digest title/date text.
-    book.set_cover("cover_thumbnail.svg", cover_thumbnail)
-
-    cover_asset, cover_story = _select_cover_asset(digest)
-    if cover_asset:
-        filename, content, media_type = cover_asset
-        cover_item = epub.EpubItem(
-            uid="cover-page-image",
-            file_name=f"images/{filename}",
-            media_type=media_type,
-            content=content,
-        )
-        book.add_item(cover_item)
-        cover_image_src = f"images/{filename}"
-        cover_image_note = _build_cover_image_note(cover_story)
-
-    cover_page = epub.EpubHtml(title="Cover", file_name="front_cover.xhtml", lang="en")
-    cover_page.content = _build_cover_page_html(cover_title, cover_image_src, cover_image_note)
-
-    chapters = [cover_page]
+    # Build story chapters; capture the first downloaded image bytes so they
+    # can be composited into the cover without a second network request.
+    story_chapters: list[epub.EpubHtml] = []
+    first_image_bytes: bytes | None = None
+    cover_story: Story | None = None
 
     for idx, story in enumerate(digest.stories, start=1):
         chapter = epub.EpubHtml(title=story.title, file_name=f"story_{idx}.xhtml", lang="en")
         body = [f"<h2>{story.title}</h2>"]
         published_label = _format_published_date(story.published_at)
         source_label = _source_label(story.source or story.url)
-        published_source_text = (
+        body.append(
             f"<p><strong>Published:</strong> {published_label} in {escape(source_label)}</p>"
         )
-        body.append(published_source_text)
         if story.image_url:
             asset = _download_image_asset(story.image_url, f"story_{idx}")
             if asset:
                 filename, content, media_type = asset
+                if first_image_bytes is None:
+                    first_image_bytes = content
+                    cover_story = story
                 item = epub.EpubItem(
                     uid=filename,
                     file_name=f"images/{filename}",
@@ -74,8 +60,26 @@ def build_epub(digest: WeeklyDigest, output_path: Path) -> Path:
         link_label = f"Read original at {source_label}"
         body.append(f'<p><a href="{story.url}">{escape(link_label)}</a></p>')
         chapter.content = "\n".join(body)
-        chapters.append(chapter)
+        story_chapters.append(chapter)
 
+    # Build Pillow-composited cover JPEG (title + date + story photo).
+    cover_jpeg = _build_cover_jpeg(cover_label, coverage_range, first_image_bytes)
+    cover_item = epub.EpubItem(
+        uid="cover-image",
+        file_name="images/cover.jpg",
+        media_type="image/jpeg",
+        content=cover_jpeg,
+    )
+    cover_item.properties = ["cover-image"]
+    book.add_item(cover_item)
+    # Legacy EPUB2 meta required for Kindle library thumbnails.
+    book.add_metadata(None, "meta", "", {"name": "cover", "content": "cover-image"})
+
+    cover_image_note = _build_cover_image_note(cover_story)
+    cover_page = epub.EpubHtml(title="Cover", file_name="front_cover.xhtml", lang="en")
+    cover_page.content = _build_cover_page_html("images/cover.jpg", cover_image_note)
+
+    chapters = [cover_page, *story_chapters]
     for chapter in chapters:
         book.add_item(chapter)
 
@@ -86,28 +90,6 @@ def build_epub(digest: WeeklyDigest, output_path: Path) -> Path:
     epub.write_epub(str(output_path), book, {})
     return output_path
 
-
-def _pick_cover_story(digest: WeeklyDigest) -> Story | None:
-    for story in digest.stories:
-        if story.image_url:
-            return story
-    return None
-
-
-def _select_cover_asset(
-    digest: WeeklyDigest,
-) -> tuple[tuple[str, bytes, str] | None, Story | None]:
-    # Prefer a successfully downloaded image from chosen stories.
-    for story in digest.stories:
-        if not story.image_url:
-            continue
-        asset = _download_image_asset(story.image_url, "cover")
-        if asset:
-            return asset, story
-
-    # If no remote image is available, fall back to a local bundled asset.
-    fallback_asset = _load_local_cover_fallback("cover")
-    return fallback_asset, None
 
 
 def _download_image_asset(url: str, stem: str) -> tuple[str, bytes, str] | None:
@@ -150,20 +132,103 @@ def _coverage_date_range(digest: WeeklyDigest) -> str:
 
 def _build_cover_image_note(story: Story | None) -> str:
     if story is None:
-        return "Cover image: default fallback artwork."
+        return ""
     image_what = story.image_credit.strip() if story.image_credit else "Lead image"
     return f"{image_what}. From: {story.title}."
 
 
-def _load_local_cover_fallback(stem: str) -> tuple[str, bytes, str] | None:
-    fallback_path = Path(__file__).resolve().parents[2] / "config" / "fallback_cover.svg"
-    if not fallback_path.exists():
-        return None
+def _build_cover_jpeg(
+    label: str,
+    date_range: str,
+    story_image_bytes: bytes | None,
+) -> bytes:
+    """Composite a 1600×2560 cover JPEG with title text and an optional story photo."""
+    W, H = 1600, 2560
+    HEADER_H = 600
+    FOOTER_H = 100
+    IMAGE_H = H - HEADER_H - FOOTER_H
+    PAD = 80
+    NAVY: tuple[int, int, int] = (26, 30, 60)
+    WHITE: tuple[int, int, int] = (255, 255, 255)
+    LIGHT: tuple[int, int, int] = (200, 210, 230)
+    PLACEHOLDER: tuple[int, int, int] = (235, 238, 242)
 
-    content = fallback_path.read_bytes()
-    suffix = fallback_path.suffix.lower() or ".svg"
-    media_type = mimetypes.guess_type(f"asset{suffix}")[0] or "image/svg+xml"
-    return f"{stem}{suffix}", content, media_type
+    canvas = Image.new("RGB", (W, H), WHITE)
+    draw = ImageDraw.Draw(canvas)
+
+    # Header band
+    draw.rectangle([(0, 0), (W, HEADER_H)], fill=NAVY)
+
+    # Story photo (or light placeholder when unavailable)
+    if story_image_bytes:
+        try:
+            story_img = Image.open(io.BytesIO(story_image_bytes)).convert("RGB")
+            ratio = W / story_img.width
+            new_h = max(int(story_img.height * ratio), 1)
+            story_img = story_img.resize((W, new_h), Image.Resampling.LANCZOS)
+            if story_img.height >= IMAGE_H:
+                top = (story_img.height - IMAGE_H) // 2
+                story_img = story_img.crop((0, top, W, top + IMAGE_H))
+            canvas.paste(story_img, (0, HEADER_H))
+        except Exception:
+            draw.rectangle([(0, HEADER_H), (W, H - FOOTER_H)], fill=PLACEHOLDER)
+    else:
+        draw.rectangle([(0, HEADER_H), (W, H - FOOTER_H)], fill=PLACEHOLDER)
+
+    # Footer band
+    draw.rectangle([(0, H - FOOTER_H), (W, H)], fill=NAVY)
+
+    # Fonts
+    title_font = _load_cover_font(size=108, bold=True)
+    date_font = _load_cover_font(size=72, bold=False)
+    footer_font = _load_cover_font(size=46, bold=False)
+
+    # Vertically centre title + date range in the header band
+    title_bb = draw.textbbox((0, 0), label, font=title_font)
+    date_bb = draw.textbbox((0, 0), date_range, font=date_font)
+    title_h = title_bb[3] - title_bb[1]
+    date_h = date_bb[3] - date_bb[1]
+    gap = 28
+    block_h = title_h + gap + date_h
+    title_y = (HEADER_H - block_h) // 2
+    date_y = title_y + title_h + gap
+
+    draw.text((PAD, title_y), label, font=title_font, fill=WHITE)
+    draw.text((PAD, date_y), date_range, font=date_font, fill=LIGHT)
+
+    # Footer label
+    draw.text((PAD, H - FOOTER_H + 27), "Kindle News", font=footer_font, fill=LIGHT)
+
+    buf = io.BytesIO()
+    canvas.save(buf, format="JPEG", quality=90)
+    return buf.getvalue()
+
+
+def _load_cover_font(size: int, bold: bool = False) -> Any:
+    candidates = (
+        [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+            "/Library/Fonts/Arial Bold.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+        ]
+        if bold
+        else [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
+            "/Library/Fonts/Arial.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+        ]
+    )
+    for path in candidates:
+        if Path(path).exists():
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:  # noqa: BLE001
+                continue
+    return ImageFont.load_default(size=size)
 
 
 def _source_label(source: str) -> str:
@@ -197,57 +262,24 @@ def _source_label(source: str) -> str:
     return base.replace("-", " ").title()
 
 
-def _build_cover_page_html(
-    title: str,
-    image_src: str | None,
-    image_note: str | None,
-) -> str:
-    escaped_title = escape(title)
-    image_html = ""
-    if image_src:
-        note_html = ""
-        if image_note:
-            note_html = f'<p class="cover-image-note">{escape(image_note)}</p>'
-        image_html = (
-            '<div class="cover-image-wrap">'
-            f'<img class="cover-image" src="{image_src}" alt="Cover image"/>'
-            f"{note_html}"
-            "</div>"
+def _build_cover_page_html(image_src: str, image_note: str) -> str:
+    """Full-screen cover page: the composited JPEG fills the screen, note below."""
+    note_html = ""
+    if image_note:
+        note_html = (
+            f'<p style="margin:0.6rem 1rem;font-size:0.78em;'
+            f'color:#555;line-height:1.35;">{escape(image_note)}</p>'
         )
-
     return (
         "<html><head><style>"
-        "body { margin: 0; padding: 0; background: #ffffff; color: #111111; }"
-        ".cover { min-height: 95vh; display: flex; flex-direction: column; "
-        "justify-content: space-between; padding: 2rem 1.5rem 1.5rem 1.5rem; "
-        "box-sizing: border-box; background: #ffffff; }"
-        ".cover-title { margin: 0; font-size: 2rem; line-height: 1.2; font-weight: 700; }"
-        ".cover-image-wrap { width: 100%; display: flex; flex-direction: column; "
-        "justify-content: flex-end; align-items: center; gap: 0.6rem; }"
-        ".cover-image { max-width: 100%; max-height: 62vh; object-fit: contain; }"
-        ".cover-image-note { margin: 0; font-size: 0.9rem; line-height: 1.35; color: #333333; }"
+        "body{margin:0;padding:0;background:#ffffff;}"
+        "img.cover{width:100%;display:block;}"
         "</style></head><body>"
-        f'<div class="cover"><h1 class="cover-title">{escaped_title}</h1>{image_html}</div>'
+        f'<img class="cover" src="{image_src}" alt="Cover"/>'
+        f"{note_html}"
         "</body></html>"
     )
 
-
-def _build_cover_thumbnail_svg(title: str) -> bytes:
-    escaped_title = escape(title)
-    svg = (
-        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2560" '
-        'viewBox="0 0 1600 2560">'
-        '<rect width="1600" height="2560" fill="#ffffff"/>'
-        '<rect x="120" y="180" width="1360" height="2200" rx="28" fill="#f2f5f8"/>'
-        '<text x="200" y="580" font-family="Georgia, serif" font-size="86" '
-        'font-weight="700" fill="#121212">Weekly News Digest</text>'
-        f'<text x="200" y="760" font-family="Georgia, serif" font-size="56" '
-        f'font-weight="600" fill="#2a2a2a">{escaped_title}</text>'
-        '<text x="200" y="2280" font-family="Georgia, serif" font-size="38" '
-        'fill="#444444">Kindle News</text>'
-        "</svg>"
-    )
-    return svg.encode("utf-8")
 
 
 def _guess_suffix(url: str, content_type: str) -> str:
