@@ -1,0 +1,14 @@
+venv/
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+
+# Keep generated artifacts out of git except final epub files
+output/artifacts/
+output/tmp/
+
+# Mac stuff
+.DS_Store
