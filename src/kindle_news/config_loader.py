@@ -43,6 +43,7 @@ def load_config(root: Path, config_path: Path | None = None) -> AppConfig:
             "state_file": str(app.paths.state_file),
             "output_dir": str(app.paths.output_dir),
             "artifact_dir": str(app.paths.artifact_dir),
+            "cache_dir": str(app.paths.cache_dir),
         },
         "selection": asdict(app.selection),
         "dedupe": asdict(app.dedupe),
@@ -61,6 +62,7 @@ def load_config(root: Path, config_path: Path | None = None) -> AppConfig:
     app.paths.state_file = Path(paths["state_file"])
     app.paths.output_dir = Path(paths["output_dir"])
     app.paths.artifact_dir = Path(paths["artifact_dir"])
+    app.paths.cache_dir = Path(paths["cache_dir"])
 
     app.selection = SelectionConfig(**merged["selection"])
     app.dedupe = DedupeConfig(**merged["dedupe"])

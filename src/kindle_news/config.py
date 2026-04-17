@@ -12,6 +12,7 @@ class PathsConfig:
     state_file: Path
     output_dir: Path
     artifact_dir: Path
+    cache_dir: Path
 
 
 @dataclass(slots=True)
@@ -91,6 +92,7 @@ def default_config(root: Path) -> AppConfig:
             state_file=config_dir / "state.json",
             output_dir=output_dir,
             artifact_dir=artifact_dir,
+            cache_dir=output_dir / "cache",
         ),
         selection=SelectionConfig(),
         dedupe=DedupeConfig(),

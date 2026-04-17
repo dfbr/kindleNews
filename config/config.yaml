@@ -8,6 +8,7 @@ paths:
   state_file: config/state.json
   output_dir: output
   artifact_dir: output/artifacts
+  cache_dir: output/cache
 
 selection:
   lookback_days: 7

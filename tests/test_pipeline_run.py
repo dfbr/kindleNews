@@ -320,3 +320,41 @@ smtp:
     assert filtered_artifact.exists()
     filtered_payload = json.loads(filtered_artifact.read_text(encoding="utf-8"))
     assert [item["story_id"] for item in filtered_payload] == ["listicle-1", "video-1"]
+
+
+def test_run_ingest_mode_writes_daily_cache(monkeypatch, tmp_path: Path) -> None:
+    root = tmp_path
+    config_dir = root / "config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "config.yaml").write_text(
+        """
+smtp:
+  host: smtp.example.com
+  port: 587
+  username: user
+  password_env_var: SMTP_PASSWORD
+  from_address: from@example.com
+  to_address: to@example.com
+""",
+        encoding="utf-8",
+    )
+    (config_dir / "feeds.txt").write_text("https://example.com/feed.xml\n", encoding="utf-8")
+    (config_dir / "editor_persona.md").write_text("Editor persona", encoding="utf-8")
+    (config_dir / "reader_topics.yaml").write_text("interests: []\n", encoding="utf-8")
+
+    story = Story(
+        story_id="ingest-1",
+        title="A story",
+        url="https://example.com/story",
+        source="feed",
+        published_at=datetime(2026, 4, 17, tzinfo=UTC),
+        summary="Feed summary",
+    )
+
+    monkeypatch.setattr("kindle_news.pipeline.load_feed_urls", lambda path: ["https://example.com/feed.xml"])
+    monkeypatch.setattr("kindle_news.pipeline.ingest_recent_stories", lambda urls, days: [story])
+
+    cache_file = run(root=root, send_email=False, mode="ingest")
+
+    assert cache_file.exists()
+    assert cache_file.name.startswith("daily-")

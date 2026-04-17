@@ -6,7 +6,7 @@ import re
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 import yaml
 
@@ -15,6 +15,7 @@ from .ai import (
     DEFAULT_SUMMARY_PROMPT_TEMPLATE,
     AIClient,
 )
+from .cache_store import clear_cache, load_cached_stories, save_daily_cache
 from .config_loader import load_config
 from .cost import CostTracker
 from .emailer import send_epub
@@ -63,14 +64,52 @@ _NON_STORY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
-def run(root: Path, config_path: Path | None = None, send_email: bool = True) -> Path:
+def run(
+    root: Path,
+    config_path: Path | None = None,
+    send_email: bool = True,
+    mode: Literal["weekly", "ingest"] = "weekly",
+) -> Path:
     config = load_config(root, config_path)
     config.paths.output_dir.mkdir(parents=True, exist_ok=True)
     config.paths.artifact_dir.mkdir(parents=True, exist_ok=True)
+    config.paths.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    feed_urls = load_feed_urls(str(config.paths.feeds_file))
-    raw_stories = ingest_recent_stories(feed_urls, config.selection.lookback_days)
+    if mode == "ingest":
+        feed_urls = load_feed_urls(str(config.paths.feeds_file))
+        raw_stories = ingest_recent_stories(feed_urls, config.selection.lookback_days)
+        _write_json(config.paths.artifact_dir / "01_raw_stories.json", raw_stories)
+        cache_file = save_daily_cache(config.paths.cache_dir, raw_stories)
+        _write_json(
+            config.paths.artifact_dir / "01b_cache_ingest.json",
+            {
+                "cache_file": str(cache_file),
+                "ingested_story_count": len(raw_stories),
+            },
+        )
+        return cache_file
+
+    cached_raw_stories, cache_files_used = load_cached_stories(
+        config.paths.cache_dir,
+        config.selection.lookback_days,
+    )
+    cache_source_used = "cache"
+    if cached_raw_stories:
+        raw_stories = cached_raw_stories
+    else:
+        cache_source_used = "live"
+        feed_urls = load_feed_urls(str(config.paths.feeds_file))
+        raw_stories = ingest_recent_stories(feed_urls, config.selection.lookback_days)
+
     _write_json(config.paths.artifact_dir / "01_raw_stories.json", raw_stories)
+    _write_json(
+        config.paths.artifact_dir / "01c_cache_load.json",
+        {
+            "cache_source_used": cache_source_used,
+            "cache_story_count": len(cached_raw_stories),
+            "cache_files_used": [str(path) for path in cache_files_used],
+        },
+    )
 
     deduped = dedupe_stories(raw_stories)
     _write_json(config.paths.artifact_dir / "02_deduped_stories.json", deduped)
@@ -200,6 +239,8 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
             "email_error": email_error,
             "cost_usd": round(tracker.total_cost_usd, 6),
             "selected_story_ids": ranking.selected_ids,
+            "cache_source_used": cache_source_used,
+            "cache_files_used": [str(path) for path in cache_files_used],
         },
     )
     _write_json(
@@ -214,6 +255,15 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
         state.used_urls.add(story.url)
         state.used_titles.add(normalize_title(story.title))
     save_state(config.paths.state_file, state)
+
+    removed_cache_files = clear_cache(config.paths.cache_dir)
+    _write_json(
+        config.paths.artifact_dir / "07_cache_cleanup.json",
+        {
+            "removed_cache_files": removed_cache_files,
+            "cache_source_used": cache_source_used,
+        },
+    )
 
     return output_epub
 
