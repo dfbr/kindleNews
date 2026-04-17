@@ -29,46 +29,64 @@ https://www.monbiot.com/feed/
 #https://www.bergenfellesverksted.no/kalender/feed/
 # stale (latest 2023-04-04)
 #https://theautomatic.net/feed/
-https://www.economist.com/rss
+# erroring feed disabled (audit 2026-04-17)
+#https://www.economist.com/rss
 https://www.theguardian.com/uk/rss
 https://www.theguardian.com/uk/technology/rss
 # stale (latest 2011-09-20)
 #http://www.exploit-monday.com/feeds/posts/default
 # stale (latest 2025-05-01)
 #http://ianduffy.ie/index.xml
-https://www.swordshield.com/feed/
+# erroring feed disabled (audit 2026-04-17)
+#https://www.swordshield.com/feed/
 # stale (latest 2024-08-06)
 #http://www.mathyvanhoef.com/feeds/posts/default
-http://colesec.inventedtheinternet.com/feed/
+# erroring feed disabled (audit 2026-04-17)
+#http://colesec.inventedtheinternet.com/feed/
 http://blog.portswigger.net/feeds/posts/default
-https://www.secureworks.com/rss?feed=research
-http://www.us-cert.gov/channels/techalerts.rdf
-https://labsblog.f-secure.com/feed/
+# erroring feed disabled (audit 2026-04-17)
+#https://www.secureworks.com/rss?feed=research
+# erroring feed disabled (audit 2026-04-17)
+#http://www.us-cert.gov/channels/techalerts.rdf
+# erroring feed disabled (audit 2026-04-17)
+#https://labsblog.f-secure.com/feed/
 http://taosecurity.blogspot.com/atom.xml
-http://www.thespanner.co.uk/feed/
-http://sysadmincasts.com/feed.rss
-https://www.coalfire.com/Solutions/Coalfire-Labs/The-Coalfire-LABS-Blog?rss=blogs
-https://d.uijn.nl/feed/
-https://www.optiv.com/resources/blog/feed
-https://ctus.io/rss/
+# erroring feed disabled (audit 2026-04-17)
+#http://www.thespanner.co.uk/feed/
+# erroring feed disabled (audit 2026-04-17)
+#http://sysadmincasts.com/feed.rss
+# erroring feed disabled (audit 2026-04-17)
+#https://www.coalfire.com/Solutions/Coalfire-Labs/The-Coalfire-LABS-Blog?rss=blogs
+# erroring feed disabled (audit 2026-04-17)
+#https://d.uijn.nl/feed/
+# erroring feed disabled (audit 2026-04-17)
+#https://www.optiv.com/resources/blog/feed
+# erroring feed disabled (audit 2026-04-17)
+#https://ctus.io/rss/
 # stale (latest 2024-10-03)
 #http://artsploit.blogspot.com/feeds/posts/default?alt=rss
-http://blog.0x3a.com/rss
-http://blog.logrhythm.com/feed/
+# erroring feed disabled (audit 2026-04-17)
+#http://blog.0x3a.com/rss
+# erroring feed disabled (audit 2026-04-17)
+#http://blog.logrhythm.com/feed/
 # stale (latest 2023-04-16)
 #https://room362.com/post/index.xml
-http://www.rvrsh3ll.net/blog/feed/
+# erroring feed disabled (audit 2026-04-17)
+#http://www.rvrsh3ll.net/blog/feed/
 # stale (latest 2024-10-15)
 #http://feeds.feedburner.com/NetspiBlog
 # stale (latest 2025-04-21)
 #https://www.n00py.io/feed/
-http://www.fireeye.com/blog/feed
+# erroring feed disabled (audit 2026-04-17)
+#http://www.fireeye.com/blog/feed
 # stale (latest 2019-06-07)
 #http://feeds.feedburner.com/GdsSecurityBlog
 # stale (latest 2017-06-25)
 #http://www.arneswinnen.net/feed/
-https://blog.skullsecurity.org/feed
-http://www.dawgyg.com/rss/
+# erroring feed disabled (audit 2026-04-17)
+#https://blog.skullsecurity.org/feed
+# erroring feed disabled (audit 2026-04-17)
+#http://www.dawgyg.com/rss/
 # stale (latest 2019-08-23)
 #http://labofapenetrationtester.blogspot.com/feeds/posts/default
 # stale (latest 2020-05-18)
@@ -79,77 +97,102 @@ http://adsecurity.org/?feed=rss2
 #http://foxglovesecurity.com/feed/
 # stale (latest 2025-08-05)
 #http://www.acunetix.com/blog/feed/
-http://stephensclafani.com/feed/
-http://feeds.feedburner.com/n0where
+# erroring feed disabled (audit 2026-04-17)
+#http://stephensclafani.com/feed/
+# erroring feed disabled (audit 2026-04-17)
+#http://feeds.feedburner.com/n0where
 # stale (latest 2024-06-19)
 #http://malwaremustdie.blogspot.com/feeds/posts/default
 # stale (latest 2023-07-08)
 #http://feeds.feedburner.com/IrongeeksSecuritySite
-http://www.sixdub.net/?feed=rss2
-http://r00tsec.blogspot.com/feeds/posts/default
-http://www.contextis.com/resources/blog/blog.xml
-http://feeds.trendmicro.com/Anti-MalwareBlog/
-http://feeds.feedburner.com/OjsRants
-http://www.sans.org/rr/rss/
+# erroring feed disabled (audit 2026-04-17)
+#http://www.sixdub.net/?feed=rss2
+# erroring feed disabled (audit 2026-04-17)
+#http://r00tsec.blogspot.com/feeds/posts/default
+# erroring feed disabled (audit 2026-04-17)
+#http://www.contextis.com/resources/blog/blog.xml
+# erroring feed disabled (audit 2026-04-17)
+#http://feeds.trendmicro.com/Anti-MalwareBlog/
+# erroring feed disabled (audit 2026-04-17)
+#http://feeds.feedburner.com/OjsRants
+# erroring feed disabled (audit 2026-04-17)
+#http://www.sans.org/rr/rss/
 # stale (latest 2018-04-23)
 #http://w00tsec.blogspot.com/feeds/posts/default
 http://www.blackhillsinfosec.com/?feed=rss2
 http://blog.didierstevens.com/feed/
-https://warroom.securestate.com/feed/
+# erroring feed disabled (audit 2026-04-17)
+#https://warroom.securestate.com/feed/
 # stale (latest 2016-12-09)
 #http://sakurity.com/blog/feed.xml
 http://randywestergren.com/feed/
-http://bufferovernoah.com/feed/
+# erroring feed disabled (audit 2026-04-17)
+#http://bufferovernoah.com/feed/
 # stale (latest 2022-12-16)
 #http://sethsec.blogspot.com/feeds/posts/default
-http://malware.dontneedcoffee.com/feeds/posts/default
+# erroring feed disabled (audit 2026-04-17)
+#http://malware.dontneedcoffee.com/feeds/posts/default
 http://derflounder.wordpress.com/feed/
 http://www.unix-ninja.com/feed/rss/
 # stale (latest 2025-04-30)
 #https://trustfoundry.net/feed/
-http://www.f-secure.com/weblog/weblog.rdf
+# erroring feed disabled (audit 2026-04-17)
+#http://www.f-secure.com/weblog/weblog.rdf
 # stale (latest 2015-04-08)
 #http://feeds.feedburner.com/SucuriSecurity
 # stale (latest 2023-10-26)
 #http://enigma0x3.wordpress.com/feed/
 # stale (latest 2015-11-09)
 #https://blog.g0tmi1k.com/atom.xml
-http://www.viruslist.com/en/rss/weblog
+# erroring feed disabled (audit 2026-04-17)
+#http://www.viruslist.com/en/rss/weblog
 https://www.wired.com/category/security/feed/
-https://feeds.feedburner.com/fortinet/blogs/security-research
+# erroring feed disabled (audit 2026-04-17)
+#https://feeds.feedburner.com/fortinet/blogs/security-research
 # likely redundant with isc.sans.edu/rssfeed_full.xml above
 #http://isc.sans.org/rssfeed.xml
-http://www.bluecoat.com/security/rss
+# erroring feed disabled (audit 2026-04-17)
+#http://www.bluecoat.com/security/rss
 # stale (latest 2025-02-21)
 #http://feeds.feedburner.com/CyberArms
 https://www.grepular.com/rss
-http://feeds.feedburner.com/PentestTools
+# erroring feed disabled (audit 2026-04-17)
+#http://feeds.feedburner.com/PentestTools
 # stale (latest 2023-10-03)
 #http://websec.ca/blog_posts/index.rss
 # stale (latest 2016-12-19)
 #http://thinkingmaliciously.blogspot.com/feeds/posts/default
 https://www.trustedsec.com/feed/
-http://community.websense.com/blogs/securitylabs/rss.aspx
+# erroring feed disabled (audit 2026-04-17)
+#http://community.websense.com/blogs/securitylabs/rss.aspx
 # stale (latest 2021-12-22)
 #http://g-laurent.blogspot.com/feeds/posts/default
 https://objective-see.com/rss.xml
-http://x42.obscurechannel.com/?feed=rss2
-http://www.harmj0y.net/blog/feed/
+# erroring feed disabled (audit 2026-04-17)
+#http://x42.obscurechannel.com/?feed=rss2
+# erroring feed disabled (audit 2026-04-17)
+#http://www.harmj0y.net/blog/feed/
 http://krebsonsecurity.com/feed/
-http://vrt-sourcefire.blogspot.com/feeds/posts/default
-http://infamoussecurity.com/?feed=rss2
+# erroring feed disabled (audit 2026-04-17)
+#http://vrt-sourcefire.blogspot.com/feeds/posts/default
+# erroring feed disabled (audit 2026-04-17)
+#http://infamoussecurity.com/?feed=rss2
 # stale (latest 2022-03-27)
 #http://www.darkoperator.com/blog/rss.xml
 http://www.cert.org/blogs/rss.xml
-http://silentbreaksecurity.com/feed/
+# erroring feed disabled (audit 2026-04-17)
+#http://silentbreaksecurity.com/feed/
 # stale (latest 2020-04-18)
 #https://fin1te.net/feed.xml
 http://googleonlinesecurity.blogspot.com/atom.xml
 # stale (latest 2024-02-14)
 #http://erratasec.blogspot.com/feeds/posts/default
-http://barracudalabs.com/feed/
-http://www.secureworks.com/rss/threat-analysis.xml
-http://www.sensepost.com/blog/index.rss
+# erroring feed disabled (audit 2026-04-17)
+#http://barracudalabs.com/feed/
+# erroring feed disabled (audit 2026-04-17)
+#http://www.secureworks.com/rss/threat-analysis.xml
+# erroring feed disabled (audit 2026-04-17)
+#http://www.sensepost.com/blog/index.rss
 # stale (latest 2020-04-18)
 #https://whitton.io/feed.xml
 # malformed URL; likely meant to be an XML feed but this path looks wrong
@@ -167,7 +210,8 @@ https://www.blog.pythonlibrary.org/feed/
 https://daniel.feldroy.com/feeds/atom.xml
 https://devblogs.microsoft.com/python/feed/
 https://www.askpython.com/feed
-http://feeds.feedburner.com/PythonForMachineLearningAndDataScience
+# erroring feed disabled (audit 2026-04-17)
+#http://feeds.feedburner.com/PythonForMachineLearningAndDataScience
 # real python and pragprog make the updated date very recent so it floods the feed. Ignoring.
 #https://realpython.com/atom.xml?format=xml
 #https://pragprog.com/rss.xml
