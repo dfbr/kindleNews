@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -13,6 +14,12 @@ from .config import AIConfig
 from .cost import CostTracker
 from .models import Story
 from .retry import retry_call
+
+logger = logging.getLogger(__name__)
+
+
+class AIResponseValidationError(RuntimeError):
+    """Raised when an AI response cannot be parsed/validated after repair."""
 
 
 @dataclass(slots=True)
@@ -57,22 +64,23 @@ class AIClient:
             }
             for s in stories
         ]
-        prompt = (
-            "You are ranking stories for a weekly digest. Return JSON only matching this schema: "
-            '{"selected": [{"story_id": "string", "reason": "string"}], "editor_note": "string"}. '
-            f"Select up to {max_stories} stories.\n"
-            f"Persona:\n{persona}\n\nReader topics:\n{topics_payload}\n\n"
-            f"Stories:\n{json.dumps(compact)}"
-        )
-        parsed = self._json_response(
-            prompt,
-            validator=self._validate_ranking_payload,
-            repair_prompt=(
-                "Your previous response was invalid. Return valid JSON only matching "
-                'this schema: {"selected": [{"story_id": "string", "reason": '
-                '"string"}], "editor_note": "string"}.'
-            ),
-        )
+        prompt = self._ranking_prompt(compact, persona, topics_payload, max_stories)
+        try:
+            parsed = self._json_response(
+                prompt,
+                validator=self._validate_ranking_payload,
+                repair_prompt=(
+                    "Your previous response was invalid. Output only one JSON object. "
+                    "No markdown, no backticks, no prose. Use this exact schema: "
+                    '{"selected": [{"story_id": "string", "reason": "string"}], '
+                    '"editor_note": "string"}. Keep selected length <= requested max_stories.'
+                ),
+            )
+        except AIResponseValidationError:
+            if not self.config.allow_heuristic_fallback:
+                raise
+            logger.warning("Falling back to heuristic ranking due to invalid AI response")
+            return self._heuristic_rank(stories, topics_payload, max_stories)
         selected = parsed.get("selected", [])
         valid_selected = [
             entry
@@ -96,19 +104,25 @@ class AIClient:
             return self._heuristic_summary(story, word_budget)
 
         self._require_client()
-        prompt = (
-            "Return JSON only matching this schema: {\"summary\": \"string\"}. "
-            f"Write around {word_budget} words.\nPersona:\n{persona}\n\n"
-            f"Title: {story.title}\nURL: {story.url}\nContent:\n{story.content[:12000]}"
-        )
-        parsed = self._json_response(
-            prompt,
-            validator=self._validate_summary_payload,
-            repair_prompt=(
-                "Your previous response was invalid. Return valid JSON only matching "
-                'this schema: {"summary": "string"}.'
-            ),
-        )
+        prompt = self._summary_prompt(story, persona, word_budget)
+        try:
+            parsed = self._json_response(
+                prompt,
+                validator=self._validate_summary_payload,
+                repair_prompt=(
+                    "Your previous response was invalid. Output only one JSON object. "
+                    "No markdown, no backticks, no prose. Use this exact schema: "
+                    '{"summary": "string"}. Ensure summary is non-empty plain text.'
+                ),
+            )
+        except AIResponseValidationError:
+            if not self.config.allow_heuristic_fallback:
+                raise
+            logger.warning(
+                "Falling back to heuristic summary for story_id=%s due to invalid AI response",
+                story.story_id,
+            )
+            return self._heuristic_summary(story, word_budget)
         return str(parsed.get("summary", "")).strip()
 
     def _json_response(
@@ -127,7 +141,12 @@ class AIClient:
                 raise
             repair_input = f"{repair_prompt}\n\nPrevious response:\n{raw}"
             repaired = self._response_text(client, repair_input)
-            return self._parse_json_payload(repaired, validator)
+            try:
+                return self._parse_json_payload(repaired, validator)
+            except (JSONDecodeError, ValueError) as exc:
+                raise AIResponseValidationError(
+                    "AI response remained invalid after one repair attempt"
+                ) from exc
 
     def _response_text(self, client: OpenAI, prompt: str) -> str:
         def _create() -> Any:
@@ -153,11 +172,71 @@ class AIClient:
         raw: str,
         validator: Callable[[dict[str, Any]], None],
     ) -> dict[str, Any]:
-        parsed = json.loads(raw)
+        payload = self._extract_json_object(raw)
+        parsed = json.loads(payload)
         if not isinstance(parsed, dict):
             raise ValueError("AI response must be a JSON object")
         validator(parsed)
         return parsed
+
+    def _extract_json_object(self, raw: str) -> str:
+        cleaned = raw.strip()
+        if not cleaned:
+            raise ValueError("AI response was empty")
+
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            cleaned = "\n".join(lines).strip()
+
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end != -1 and start < end:
+            return cleaned[start : end + 1]
+        return cleaned
+
+    def _ranking_prompt(
+        self,
+        compact: list[dict[str, str]],
+        persona: str,
+        topics_payload: str,
+        max_stories: int,
+    ) -> str:
+        return (
+            "Task: rank stories for a weekly digest.\n"
+            "Output contract:\n"
+            "- Return exactly one JSON object and nothing else.\n"
+            "- Do not use markdown, code fences, comments, or trailing commas.\n"
+            "- JSON must start with '{' and end with '}'.\n"
+            "- Use this schema exactly: "
+            '{"selected": [{"story_id": "string", "reason": "string"}], '
+            '"editor_note": "string"}.\n'
+            f"- selected must contain at most {max_stories} items.\n"
+            "- Every selected item must contain non-empty story_id and reason strings.\n"
+            "- editor_note must be a concise string.\n\n"
+            f"Persona:\n{persona}\n\n"
+            f"Reader topics:\n{topics_payload}\n\n"
+            f"Stories:\n{json.dumps(compact)}"
+        )
+
+    def _summary_prompt(self, story: Story, persona: str, word_budget: int) -> str:
+        return (
+            "Task: summarize one story for a weekly digest.\n"
+            "Output contract:\n"
+            "- Return exactly one JSON object and nothing else.\n"
+            "- Do not use markdown, code fences, comments, or trailing commas.\n"
+            "- JSON must start with '{' and end with '}'.\n"
+            '- Use this schema exactly: {"summary": "string"}.\n'
+            "- summary must be non-empty plain text.\n"
+            f"- Target length around {word_budget} words.\n\n"
+            f"Persona:\n{persona}\n\n"
+            f"Title: {story.title}\n"
+            f"URL: {story.url}\n"
+            f"Content:\n{story.content[:12000]}"
+        )
 
     def _validate_ranking_payload(self, parsed: dict[str, Any]) -> None:
         selected = parsed.get("selected")

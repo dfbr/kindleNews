@@ -77,3 +77,22 @@ def test_summarize_story_repairs_invalid_schema() -> None:
     result = client.summarize_story(story, "persona", 120)
 
     assert result == "Repaired summary"
+
+
+def test_summarize_story_falls_back_on_unparseable_response() -> None:
+    tracker = CostTracker(max_cost_usd=1.0, input_cost_per_1m=0.1, output_cost_per_1m=0.1)
+    client = AIClient(AIConfig(allow_heuristic_fallback=True, max_retries=0), tracker)
+    client._client = FakeClient(["", "still not json"])
+    story = Story(
+        story_id="1",
+        title="Story",
+        url="https://example.com",
+        source="feed",
+        published_at=__import__("datetime").datetime(2026, 4, 17),
+        content=" ".join(["word"] * 250),
+    )
+
+    result = client.summarize_story(story, "persona", 120)
+
+    assert result
+    assert isinstance(result, str)

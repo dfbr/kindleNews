@@ -1,8 +1,9 @@
-import feedparser
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-CUTOFF_DATE = datetime(2025, 10, 17, tzinfo=timezone.utc)
+import feedparser
+
+CUTOFF_DATE = datetime(2025, 10, 17, tzinfo=UTC)
 
 def main():
     active_recent = []
@@ -10,9 +11,12 @@ def main():
     errors = []
 
     try:
-        with open('config/feeds.txt', 'r') as f:
+        with open('config/feeds.txt') as f:
             lines = f.readlines()
-            urls = [line.strip() for line in lines if line.strip() and not line.strip().startswith('#')]
+            urls = [
+                line.strip() for line in lines
+                if line.strip() and not line.strip().startswith("#")
+            ]
     except FileNotFoundError:
         print(json.dumps({"errors": [{"url": "config/feeds.txt", "error": "File not found"}]}))
         return
@@ -29,9 +33,9 @@ def main():
             for entry in d.entries:
                 dt = None
                 if 'published_parsed' in entry and entry.published_parsed:
-                    dt = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+                    dt = datetime(*entry.published_parsed[:6], tzinfo=UTC)
                 elif 'updated_parsed' in entry and entry.updated_parsed:
-                    dt = datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
+                    dt = datetime(*entry.updated_parsed[:6], tzinfo=UTC)
                 
                 if dt:
                     if latest_date is None or dt > latest_date:

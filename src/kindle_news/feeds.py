@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -14,6 +14,17 @@ from dateutil import parser as date_parser
 from .models import Story
 
 logger = logging.getLogger(__name__)
+
+_TZINFOS = {
+    "EST": timezone(timedelta(hours=-5)),
+    "EDT": timezone(timedelta(hours=-4)),
+    "CST": timezone(timedelta(hours=-6)),
+    "CDT": timezone(timedelta(hours=-5)),
+    "MST": timezone(timedelta(hours=-7)),
+    "MDT": timezone(timedelta(hours=-6)),
+    "PST": timezone(timedelta(hours=-8)),
+    "PDT": timezone(timedelta(hours=-7)),
+}
 
 _TRACKING_KEYS = {
     "utm_source",
@@ -138,7 +149,7 @@ def ingest_recent_stories(feed_urls: list[str], lookback_days: int) -> list[Stor
             raw_date = getattr(entry, "published", None) or getattr(entry, "updated", None)
             if not raw_date:
                 continue
-            published_at = date_parser.parse(raw_date)
+            published_at = date_parser.parse(raw_date, tzinfos=_TZINFOS)
             if published_at.tzinfo is None:
                 published_at = published_at.replace(tzinfo=UTC)
             if published_at < cutoff:

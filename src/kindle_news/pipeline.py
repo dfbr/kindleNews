@@ -94,9 +94,24 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
 
     total_words = target_pages * config.selection.words_per_page
     budgets = _allocate_word_budgets(downloaded, total_words)
+    summarized: list[Story] = []
+    summary_failures: list[dict[str, str]] = []
     for story, budget in zip(downloaded, budgets, strict=True):
         story.word_budget = budget
-        story.summary = ai_client.summarize_story(story, persona, budget)
+        try:
+            story.summary = ai_client.summarize_story(story, persona, budget)
+        except RuntimeError as exc:
+            logger.warning("Failed to summarize story %s: %s", story.story_id, exc)
+            summary_failures.append(
+                {
+                    "story_id": story.story_id,
+                    "url": story.url,
+                    "reason": "summary_failed",
+                }
+            )
+            continue
+        summarized.append(story)
+    _write_json(config.paths.artifact_dir / "04_summary_failures.json", summary_failures)
 
     publication_date = datetime.now(UTC).date().isoformat()
     title = f"Weekly News Digest {publication_date}"
@@ -104,7 +119,7 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
         publication_date=publication_date,
         title=title,
         editor_note=ranking.editor_note,
-        stories=downloaded,
+        stories=summarized,
     )
 
     output_epub = config.paths.output_dir / f"{publication_date}.epub"
@@ -120,7 +135,8 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
             "deduped_story_count": len(deduped),
             "fresh_story_count": len(fresh),
             "picked_story_count": len(picked),
-            "story_count": len(downloaded),
+            "story_count": len(summarized),
+            "summary_failure_count": len(summary_failures),
             "cost_usd": round(tracker.total_cost_usd, 6),
             "selected_story_ids": ranking.selected_ids,
         },
@@ -129,7 +145,7 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
     if send_email:
         send_epub(config.smtp, output_epub, title)
 
-    for story in downloaded:
+    for story in summarized:
         state.used_urls.add(story.url)
         state.used_titles.add(normalize_title(story.title))
     save_state(config.paths.state_file, state)
