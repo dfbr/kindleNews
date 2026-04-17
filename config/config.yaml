@@ -1,0 +1,47 @@
+timezone: GMT
+publication_hour_gmt: 5
+
+paths:
+  feeds_file: config/feeds.txt
+  editor_persona_file: config/editor_persona.md
+  reader_topics_file: config/reader_topics.yaml
+  state_file: config/state.json
+  output_dir: output
+  artifact_dir: output/artifacts
+
+selection:
+  lookback_days: 7
+  max_stories: 15
+  min_pages: 10
+  max_pages: 20
+  words_per_page: 500
+
+dedupe:
+  title_similarity_threshold: 0.9
+  continuation_markers:
+    - update
+    - updated
+    - live
+    - latest
+    - briefing
+    - what next
+    - analysis
+
+ai:
+  provider: openai
+  model: gpt-4.1-mini
+  max_input_tokens: 200000
+  max_output_tokens: 2000
+  max_cost_usd: 1.0
+  input_cost_per_1m: 0.4
+  output_cost_per_1m: 1.6
+  allow_heuristic_fallback: true
+
+smtp:
+  host: smtp.example.com
+  port: 587
+  username: username
+  password_env_var: SMTP_PASSWORD
+  from_address: from@example.com
+  to_address: kindle@kindle.com
+  use_tls: true

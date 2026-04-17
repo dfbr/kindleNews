@@ -1,0 +1,9 @@
+interests:
+  - topic: technology
+    score: 80
+  - topic: AI policy
+    score: 75
+  - topic: climate
+    score: 70
+  - topic: celebrity gossip
+    score: -80

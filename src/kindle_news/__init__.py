@@ -1,0 +1,1 @@
+"""Kindle news digest package."""
