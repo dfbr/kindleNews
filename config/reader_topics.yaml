@@ -29,3 +29,9 @@ interests:
     score: 60
   - topic: New Zealand
     score: 65
+  - topic: Book reviews
+    score: -60
+  - topic: film reviews
+    score: -60
+  - topic: cultural reviews
+    score: -60
