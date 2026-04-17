@@ -6,6 +6,7 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from json import JSONDecodeError
+from string import Template
 from typing import Any
 
 from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
@@ -16,6 +17,59 @@ from .models import Story
 from .retry import retry_call
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_RANKING_PROMPT_TEMPLATE = """Task: rank stories for a weekly digest.
+Output contract:
+- Return exactly one JSON object and nothing else.
+- Do not use markdown, code fences, comments, or trailing commas.
+- JSON must start with '{' and end with '}'.
+- Use this schema exactly:
+    {\"selected\": [{\"story_id\": \"string\", \"reason\": \"string\"}],
+    \"editor_note\": \"string\"}.
+- selected must contain at most $max_stories items.
+- Every selected item must contain non-empty story_id and reason strings.
+- editor_note must be a concise string.
+
+Hard exclusions (never select):
+- Reader callouts or participation requests.
+- Housekeeping/promotional items (newsletters, subscriptions, donations, contests, app prompts).
+- Listicles (for example: "10 ways", "5 things", "top 7", "best 12").
+- Video-led content where the core item is a video, clip, or livestream.
+- Pure live pages/rolling updates with no new reported development.
+- Clickbait framing with weak policy, market, or institutional substance.
+If uncertain whether an item is journalism or a callout/promo/listicle/video item, exclude it.
+
+Eligibility test (must pass):
+- Contains a concrete development, decision, data release, investigation, or reported analysis.
+- Has clear public-interest relevance to policy, institutions, markets, science, or culture.
+
+Persona:
+$persona
+
+Reader topics:
+$topics_payload
+
+Stories:
+$stories_json
+"""
+
+DEFAULT_SUMMARY_PROMPT_TEMPLATE = """Task: summarize one story for a weekly digest.
+Output contract:
+- Return exactly one JSON object and nothing else.
+- Do not use markdown, code fences, comments, or trailing commas.
+- JSON must start with '{' and end with '}'.
+- Use this schema exactly: {\"summary\": \"string\"}.
+- summary must be non-empty plain text.
+- Target length around $word_budget words.
+
+Persona:
+$persona
+
+Title: $title
+URL: $url
+Content:
+$content
+"""
 
 
 class AIResponseValidationError(RuntimeError):
@@ -30,9 +84,17 @@ class RankingResult:
 
 
 class AIClient:
-    def __init__(self, config: AIConfig, cost_tracker: CostTracker) -> None:
+    def __init__(
+        self,
+        config: AIConfig,
+        cost_tracker: CostTracker,
+        ranking_prompt_template: str = DEFAULT_RANKING_PROMPT_TEMPLATE,
+        summary_prompt_template: str = DEFAULT_SUMMARY_PROMPT_TEMPLATE,
+    ) -> None:
         self.config = config
         self.cost_tracker = cost_tracker
+        self.ranking_prompt_template = ranking_prompt_template
+        self.summary_prompt_template = summary_prompt_template
         api_key = os.getenv("OPENAI_API_KEY")
         self._client = OpenAI(api_key=api_key) if api_key else None
 
@@ -205,37 +267,20 @@ class AIClient:
         topics_payload: str,
         max_stories: int,
     ) -> str:
-        return (
-            "Task: rank stories for a weekly digest.\n"
-            "Output contract:\n"
-            "- Return exactly one JSON object and nothing else.\n"
-            "- Do not use markdown, code fences, comments, or trailing commas.\n"
-            "- JSON must start with '{' and end with '}'.\n"
-            "- Use this schema exactly: "
-            '{"selected": [{"story_id": "string", "reason": "string"}], '
-            '"editor_note": "string"}.\n'
-            f"- selected must contain at most {max_stories} items.\n"
-            "- Every selected item must contain non-empty story_id and reason strings.\n"
-            "- editor_note must be a concise string.\n\n"
-            f"Persona:\n{persona}\n\n"
-            f"Reader topics:\n{topics_payload}\n\n"
-            f"Stories:\n{json.dumps(compact)}"
+        return Template(self.ranking_prompt_template).safe_substitute(
+            max_stories=str(max_stories),
+            persona=persona,
+            topics_payload=topics_payload,
+            stories_json=json.dumps(compact),
         )
 
     def _summary_prompt(self, story: Story, persona: str, word_budget: int) -> str:
-        return (
-            "Task: summarize one story for a weekly digest.\n"
-            "Output contract:\n"
-            "- Return exactly one JSON object and nothing else.\n"
-            "- Do not use markdown, code fences, comments, or trailing commas.\n"
-            "- JSON must start with '{' and end with '}'.\n"
-            '- Use this schema exactly: {"summary": "string"}.\n'
-            "- summary must be non-empty plain text.\n"
-            f"- Target length around {word_budget} words.\n\n"
-            f"Persona:\n{persona}\n\n"
-            f"Title: {story.title}\n"
-            f"URL: {story.url}\n"
-            f"Content:\n{story.content[:12000]}"
+        return Template(self.summary_prompt_template).safe_substitute(
+            word_budget=str(word_budget),
+            persona=persona,
+            title=story.title,
+            url=story.url,
+            content=story.content[:12000],
         )
 
     def _validate_ranking_payload(self, parsed: dict[str, Any]) -> None:

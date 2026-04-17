@@ -1,0 +1,17 @@
+Task: summarize one story for a weekly digest.
+Output contract:
+- Return exactly one JSON object and nothing else.
+- Do not use markdown, code fences, comments, or trailing commas.
+- JSON must start with '{' and end with '}'.
+- Use this schema exactly: {"summary": "string"}.
+- summary must be non-empty plain text.
+- Target length around $word_budget words.
+- Be careful not to make up any part within the summary, keep to the facts.
+
+Persona:
+$persona
+
+Title: $title
+URL: $url
+Content:
+$content

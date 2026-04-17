@@ -1,7 +1,7 @@
 ---
 publication:
-  max_pages: 20
-  target_pages: 12
+  max_pages: 25
+  target_pages: 15
   target_stories: 15
 balance:
   guidance: "Lead with business of technology, then UK and Norwegian politics (in English), followed by science and culture coverage that avoids event reviews."

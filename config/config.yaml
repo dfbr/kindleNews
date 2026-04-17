@@ -36,6 +36,8 @@ ai:
   input_cost_per_1m: 0.4
   output_cost_per_1m: 1.6
   allow_heuristic_fallback: true
+  ranking_prompt_file: config/prompts/ranking_prompt.txt
+  summary_prompt_file: config/prompts/summary_prompt.txt
 
 smtp:
   host: smtp.fastmail.com

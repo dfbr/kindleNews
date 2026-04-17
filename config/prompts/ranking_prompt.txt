@@ -1,0 +1,34 @@
+Task: rank stories for a weekly digest.
+Output contract:
+- Return exactly one JSON object and nothing else.
+- Do not use markdown, code fences, comments, or trailing commas.
+- JSON must start with '{' and end with '}'.
+- Use this schema exactly: {"selected": [{"story_id": "string", "reason": "string"}], "editor_note": "string"}.
+- selected must contain at most $max_stories items.
+- Every selected item must contain non-empty story_id and reason strings.
+- editor_note must be a concise string.
+
+Hard exclusions (never select):
+- Reader callouts or participation requests, including titles/summaries like:
+  "tell us what you think", "share your views", "send us your story", "send us your photos",
+  "ask us your questions", "have your say", "reader survey", "reader poll", "Q&A callout".
+- Housekeeping/promotional items: newsletters, subscriptions, competitions, donation drives,
+  app-download prompts, account/sign-in announcements, event tickets, merchandising.
+- Listicles, for example headline forms like "10 ways...", "5 things...", "top 7...", "best 12...".
+- Video-led content where the primary item is a video, clip, reel, or livestream.
+- Pure live pages, rolling updates, or explainers with no new reported development.
+- Sensational clickbait framing with weak policy/economic/institutional substance.
+If uncertain whether an item is journalism or a callout/promo/listicle/video item, exclude it.
+
+Eligibility test (must pass):
+- Contains a concrete development, decision, data release, investigation, or reported analysis.
+- Has clear public-interest relevance to policy, institutions, markets, science, or culture.
+
+Persona:
+$persona
+
+Reader topics:
+$topics_payload
+
+Stories:
+$stories_json

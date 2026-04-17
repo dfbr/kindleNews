@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -31,6 +32,8 @@ def build_epub(digest: WeeklyDigest, output_path: Path) -> Path:
     for idx, story in enumerate(digest.stories, start=1):
         chapter = epub.EpubHtml(title=story.title, file_name=f"story_{idx}.xhtml", lang="en")
         body = [f"<h2>{story.title}</h2>"]
+        published_label = _format_published_date(story.published_at)
+        body.append(f"<p><strong>Published:</strong> {published_label}</p>")
         if story.image_url:
             asset = _download_image_asset(story.image_url, f"story_{idx}")
             if asset:
@@ -79,6 +82,12 @@ def _download_image_asset(url: str, stem: str) -> tuple[str, bytes, str] | None:
     media_type = mimetypes.guess_type(f"asset{suffix}")[0] or "image/jpeg"
     filename = f"{stem}{suffix}"
     return filename, response.content, media_type
+
+
+def _format_published_date(value: datetime | None) -> str:
+    if value is None:
+        return "Unknown"
+    return value.strftime("%d.%m.%Y")
 
 
 def _guess_suffix(url: str, content_type: str) -> str:

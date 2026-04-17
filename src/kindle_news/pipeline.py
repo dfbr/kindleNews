@@ -10,7 +10,11 @@ from typing import Any, TypeAlias
 
 import yaml
 
-from .ai import AIClient
+from .ai import (
+    DEFAULT_RANKING_PROMPT_TEMPLATE,
+    DEFAULT_SUMMARY_PROMPT_TEMPLATE,
+    AIClient,
+)
 from .config_loader import load_config
 from .cost import CostTracker
 from .emailer import send_epub
@@ -33,6 +37,31 @@ logger = logging.getLogger(__name__)
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list[Any] | dict[str, Any]
 
+_NON_STORY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "reader_callout",
+        re.compile(
+            r"\b(tell us what you think|share your views|send us your|have your say|"
+            r"reader poll|reader survey|ask us your questions|q&a callout)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "listicle",
+        re.compile(
+            r"\b(\d+\s+(ways|things|reasons|lessons|tips|takeaways)|top\s+\d+|best\s+\d+)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "video_content",
+        re.compile(
+            r"\b(video|watch|clip|livestream|live stream|youtube|tiktok|reel)\b",
+            re.IGNORECASE,
+        ),
+    ),
+)
+
 
 def run(root: Path, config_path: Path | None = None, send_email: bool = True) -> Path:
     config = load_config(root, config_path)
@@ -48,6 +77,8 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
 
     state = load_state(config.paths.state_file)
     fresh = _exclude_seen_with_config(deduped, state, config)
+    fresh, non_story_filtered = _exclude_non_story_candidates(fresh)
+    _write_json(config.paths.artifact_dir / "02b_non_story_filtered.json", non_story_filtered)
 
     persona = config.paths.editor_persona_file.read_text(encoding="utf-8")
     persona_overrides = _persona_publication_overrides(persona)
@@ -65,7 +96,22 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
         input_cost_per_1m=config.ai.input_cost_per_1m,
         output_cost_per_1m=config.ai.output_cost_per_1m,
     )
-    ai_client = AIClient(config.ai, tracker)
+    ranking_prompt_template = _read_prompt_template(
+        root,
+        config.ai.ranking_prompt_file,
+        DEFAULT_RANKING_PROMPT_TEMPLATE,
+    )
+    summary_prompt_template = _read_prompt_template(
+        root,
+        config.ai.summary_prompt_file,
+        DEFAULT_SUMMARY_PROMPT_TEMPLATE,
+    )
+    ai_client = AIClient(
+        config.ai,
+        tracker,
+        ranking_prompt_template=ranking_prompt_template,
+        summary_prompt_template=summary_prompt_template,
+    )
     ranking = ai_client.rank_stories(fresh, persona, topics_payload, story_limit)
 
     selected_ids = set(ranking.selected_ids)
@@ -146,6 +192,7 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
             "raw_story_count": len(raw_stories),
             "deduped_story_count": len(deduped),
             "fresh_story_count": len(fresh),
+            "non_story_filtered_count": len(non_story_filtered),
             "picked_story_count": len(picked),
             "story_count": len(summarized),
             "summary_failure_count": len(summary_failures),
@@ -270,6 +317,47 @@ def _coerce_positive_int(value: Any, default: int) -> int:
     except (TypeError, ValueError):
         return default
     return parsed if parsed > 0 else default
+
+
+def _read_prompt_template(root: Path, path: Path, fallback: str) -> str:
+    target = path if path.is_absolute() else root / path
+    if not target.exists():
+        logger.warning("Prompt template file not found; using fallback: %s", target)
+        return fallback
+    return target.read_text(encoding="utf-8")
+
+
+def _exclude_non_story_candidates(stories: list[Story]) -> tuple[list[Story], list[dict[str, str]]]:
+    kept: list[Story] = []
+    filtered: list[dict[str, str]] = []
+
+    for story in stories:
+        text = f"{story.title} {story.summary}"
+        url = story.url.lower()
+        matched_reason = ""
+
+        for reason, pattern in _NON_STORY_PATTERNS:
+            if pattern.search(text):
+                matched_reason = reason
+                break
+
+        if not matched_reason and ("/video" in url or "video." in url):
+            matched_reason = "video_content"
+
+        if matched_reason:
+            filtered.append(
+                {
+                    "story_id": story.story_id,
+                    "url": story.url,
+                    "title": story.title,
+                    "reason": matched_reason,
+                }
+            )
+            continue
+
+        kept.append(story)
+
+    return kept, filtered
 
 
 def _allocate_word_budgets(stories: list[Story], total_words: int) -> list[int]:
