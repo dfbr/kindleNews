@@ -36,7 +36,15 @@ def send_epub(smtp_cfg: SMTPConfig, epub_path: Path, subject: str) -> None:
             if smtp_cfg.use_tls:
                 server.starttls()
             if smtp_cfg.username:
-                server.login(smtp_cfg.username, password)
+                try:
+                    server.login(smtp_cfg.username, password)
+                except smtplib.SMTPAuthenticationError as exc:
+                    raise RuntimeError(
+                        "SMTP authentication failed. Check smtp.username, smtp.host/port, and "
+                        f"the {smtp_cfg.password_env_var} secret value. "
+                        f"Target server: {smtp_cfg.host}:{smtp_cfg.port}, "
+                        f"username: {smtp_cfg.username}"
+                    ) from exc
             server.send_message(message)
 
     retry_call(

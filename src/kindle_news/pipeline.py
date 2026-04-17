@@ -124,6 +124,18 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
 
     output_epub = config.paths.output_dir / f"{publication_date}.epub"
     build_epub(digest, output_epub)
+
+    email_delivery_status = "skipped"
+    email_error = ""
+    if send_email:
+        try:
+            send_epub(config.smtp, output_epub, title)
+            email_delivery_status = "sent"
+        except RuntimeError as exc:
+            email_delivery_status = "failed"
+            email_error = str(exc)
+            logger.warning("Failed to email EPUB; keeping generated file for manual use: %s", exc)
+
     _write_json(
         config.paths.artifact_dir / "05_digest_metadata.json",
         {
@@ -137,13 +149,19 @@ def run(root: Path, config_path: Path | None = None, send_email: bool = True) ->
             "picked_story_count": len(picked),
             "story_count": len(summarized),
             "summary_failure_count": len(summary_failures),
+            "email_delivery_status": email_delivery_status,
+            "email_error": email_error,
             "cost_usd": round(tracker.total_cost_usd, 6),
             "selected_story_ids": ranking.selected_ids,
         },
     )
-
-    if send_email:
-        send_epub(config.smtp, output_epub, title)
+    _write_json(
+        config.paths.artifact_dir / "06_email_delivery.json",
+        {
+            "email_delivery_status": email_delivery_status,
+            "email_error": email_error,
+        },
+    )
 
     for story in summarized:
         state.used_urls.add(story.url)
