@@ -11,7 +11,8 @@ https://onlythestoriesyouwant.link/uibJournal.rss
 https://feeds.bbci.co.uk/news/world/rss.xml?edition=uk
 https://agupubs.onlinelibrary.wiley.com/feed/21699011/most-recent
 https://calnewport.com/feed/
-https://reasonstobecheerful.world/feed/
+# erroring feed disabled (audit 2026-04-17): XML mismatched tag
+#https://reasonstobecheerful.world/feed/
 https://shkspr.mobi/blog/feed/atom/
 https://www.honest-broker.com/feed
 # off-brief for the current editorial focus
@@ -204,7 +205,8 @@ http://googleonlinesecurity.blogspot.com/atom.xml
 # link forum feed; tends to be noisy for this digest format
 #https://news.ycombinator.com/rss
 https://www.raspberrypi.com/news/feed/
-https://www.blog.pythonlibrary.org/feed/
+# flaky feed disabled (audit 2026-04-17): repeated connect timeouts in GitHub Actions
+#https://www.blog.pythonlibrary.org/feed/
 # stale (latest 2024-12-29)
 #https://feeds.feedburner.com/DougHellmann/
 https://daniel.feldroy.com/feeds/atom.xml
