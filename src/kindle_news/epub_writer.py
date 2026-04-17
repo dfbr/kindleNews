@@ -36,7 +36,8 @@ def build_epub(digest: WeeklyDigest, output_path: Path) -> Path:
             cover_image_src = f"images/{filename}"
             cover_image_note = _build_cover_image_note(cover_story)
 
-    cover_title = f"Weekly news digest {_format_cover_date(digest.publication_date)}"
+    coverage_range = _coverage_date_range(digest)
+    cover_title = f"Weekly news digest {coverage_range}"
     cover_page = epub.EpubHtml(title="Cover", file_name="cover.xhtml", lang="en")
     cover_page.content = _build_cover_page_html(cover_title, cover_image_src, cover_image_note)
 
@@ -114,6 +115,17 @@ def _format_cover_date(publication_date: str) -> str:
     except ValueError:
         return publication_date
     return parsed.strftime("%d.%m.%Y")
+
+
+def _coverage_date_range(digest: WeeklyDigest) -> str:
+    dates = [story.published_at for story in digest.stories if story.published_at is not None]
+    if not dates:
+        fallback = _format_cover_date(digest.publication_date)
+        return f"{fallback} - {fallback}"
+
+    first = min(dates).strftime("%d.%m.%Y")
+    last = max(dates).strftime("%d.%m.%Y")
+    return f"{first} - {last}"
 
 
 def _build_cover_image_note(story: Story) -> str:
