@@ -5,5 +5,27 @@ interests:
     score: 75
   - topic: climate
     score: 70
+  - topic: environment
+    score: 50
+  - topic: good news
+    score: 95
+  - topic: science
+    score: 65
+  - topic: business
+    score: 60
+  - topic: british politics
+    score: 70
+  - topic: US politics
+    score: 45
+  - topic: kayaking
+    score: 85
+  - topic: sports
+    score: -20
   - topic: celebrity gossip
     score: -80
+  - topic: Donald Trump
+    score: -20
+  - topic: Norwegian politics
+    score: 60
+  - topic: New Zealand
+    score: 65
