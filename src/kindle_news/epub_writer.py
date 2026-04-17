@@ -21,6 +21,14 @@ def build_epub(digest: WeeklyDigest, output_path: Path) -> Path:
 
     cover_image_src: str | None = None
     cover_image_note: str | None = None
+    coverage_range = _coverage_date_range(digest)
+    cover_title = f"Weekly news digest {coverage_range}"
+
+    cover_thumbnail = _build_cover_thumbnail_svg(cover_title)
+    # This metadata cover is what many readers (including Kindle library view)
+    # use for thumbnails, so it must include digest title/date text.
+    book.set_cover("cover_thumbnail.svg", cover_thumbnail)
+
     cover_asset, cover_story = _select_cover_asset(digest)
     if cover_asset:
         filename, content, media_type = cover_asset
@@ -33,11 +41,7 @@ def build_epub(digest: WeeklyDigest, output_path: Path) -> Path:
         book.add_item(cover_item)
         cover_image_src = f"images/{filename}"
         cover_image_note = _build_cover_image_note(cover_story)
-        # Set EPUB-level cover metadata so e-readers can render library thumbnails.
-        book.set_cover(filename, content)
 
-    coverage_range = _coverage_date_range(digest)
-    cover_title = f"Weekly news digest {coverage_range}"
     cover_page = epub.EpubHtml(title="Cover", file_name="front_cover.xhtml", lang="en")
     cover_page.content = _build_cover_page_html(cover_title, cover_image_src, cover_image_note)
 
@@ -226,6 +230,24 @@ def _build_cover_page_html(
         f'<div class="cover"><h1 class="cover-title">{escaped_title}</h1>{image_html}</div>'
         "</body></html>"
     )
+
+
+def _build_cover_thumbnail_svg(title: str) -> bytes:
+    escaped_title = escape(title)
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2560" '
+        'viewBox="0 0 1600 2560">'
+        '<rect width="1600" height="2560" fill="#ffffff"/>'
+        '<rect x="120" y="180" width="1360" height="2200" rx="28" fill="#f2f5f8"/>'
+        '<text x="200" y="580" font-family="Georgia, serif" font-size="86" '
+        'font-weight="700" fill="#121212">Weekly News Digest</text>'
+        f'<text x="200" y="760" font-family="Georgia, serif" font-size="56" '
+        f'font-weight="600" fill="#2a2a2a">{escaped_title}</text>'
+        '<text x="200" y="2280" font-family="Georgia, serif" font-size="38" '
+        'fill="#444444">Kindle News</text>'
+        "</svg>"
+    )
+    return svg.encode("utf-8")
 
 
 def _guess_suffix(url: str, content_type: str) -> str:
