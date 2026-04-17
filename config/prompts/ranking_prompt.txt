@@ -24,6 +24,12 @@ Eligibility test (must pass):
 - Contains a concrete development, decision, data release, investigation, or reported analysis.
 - Has clear public-interest relevance to policy, institutions, markets, science, or culture.
 
+Topic weighting rules:
+- Reader topics are provided as YAML entries with `topic` and `score`.
+- Positive scores indicate preference; higher positive scores should rank higher.
+- Negative scores indicate aversion; stories dominated by negative-score topics should be deprioritized or excluded.
+- Treat strongly negative topics as a veto unless there is exceptional public-interest significance.
+
 Persona:
 $persona
 

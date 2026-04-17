@@ -47,7 +47,7 @@ class AIConfig:
     max_cost_usd: float = 1.0
     input_cost_per_1m: float = 0.4
     output_cost_per_1m: float = 1.6
-    allow_heuristic_fallback: bool = True
+    allow_heuristic_fallback: bool = False
     max_retries: int = 2
     repair_invalid_json_once: bool = True
     ranking_prompt_file: Path = Path("config/prompts/ranking_prompt.txt")

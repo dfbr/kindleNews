@@ -96,3 +96,38 @@ def test_summarize_story_falls_back_on_unparseable_response() -> None:
 
     assert result
     assert isinstance(result, str)
+
+
+def test_heuristic_rank_respects_negative_topic_scores() -> None:
+    tracker = CostTracker(max_cost_usd=1.0, input_cost_per_1m=0.1, output_cost_per_1m=0.1)
+    client = AIClient(AIConfig(allow_heuristic_fallback=True, max_retries=0), tracker)
+    stories = [
+        Story(
+            story_id="sports-1",
+            title="Sports roundup: championship highlights",
+            url="https://example.com/sports",
+            source="feed",
+            published_at=__import__("datetime").datetime(2026, 4, 17),
+            summary="A major sports tournament and results update.",
+        ),
+        Story(
+            story_id="climate-1",
+            title="Climate policy update from Brussels",
+            url="https://example.com/climate",
+            source="feed",
+            published_at=__import__("datetime").datetime(2026, 4, 17),
+            summary="New climate regulations and environmental policy milestones.",
+        ),
+    ]
+
+    topics_payload = """
+interests:
+  - topic: climate
+    score: 70
+  - topic: sports
+    score: -20
+"""
+
+    result = client.rank_stories(stories, "persona", topics_payload, 2)
+
+    assert result.selected_ids[0] == "climate-1"

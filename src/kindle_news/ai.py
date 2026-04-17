@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from json import JSONDecodeError
 from string import Template
 from typing import Any
 
+import yaml
 from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
 
 from .config import AIConfig
@@ -42,6 +44,13 @@ If uncertain whether an item is journalism or a callout/promo/listicle/video ite
 Eligibility test (must pass):
 - Contains a concrete development, decision, data release, investigation, or reported analysis.
 - Has clear public-interest relevance to policy, institutions, markets, science, or culture.
+
+Topic weighting rules:
+- Reader topics are provided as YAML entries with `topic` and `score`.
+- Positive scores mean stronger preference; higher positive scores should rank higher.
+- Negative scores mean aversion; stories dominated by negative-score topics should be
+    deprioritized or excluded.
+- Treat strongly negative topics as a veto unless there is exceptional public-interest importance.
 
 Persona:
 $persona
@@ -314,21 +323,65 @@ class AIClient:
         topics_payload: str,
         max_stories: int,
     ) -> RankingResult:
-        topics = topics_payload.lower()
+        weighted_topics = self._parse_weighted_topics(topics_payload)
 
-        def score(story: Story) -> int:
-            text = f"{story.title} {story.summary}".lower()
-            hits = sum(1 for token in topics.split() if len(token) > 3 and token in text)
-            return hits
+        if not weighted_topics:
+            topics = topics_payload.lower()
+
+            def score(story: Story) -> int:
+                text = f"{story.title} {story.summary}".lower()
+                return sum(1 for token in topics.split() if len(token) > 3 and token in text)
+
+        else:
+
+            def score(story: Story) -> int:
+                text = f"{story.title} {story.summary}".lower()
+                total = 0
+                for topic, weight in weighted_topics:
+                    if topic in text:
+                        total += weight * 3
+                    tokens = [tok for tok in re.split(r"\W+", topic) if len(tok) > 3]
+                    token_hits = sum(1 for tok in tokens if tok in text)
+                    total += weight * token_hits
+                return total
 
         ordered = sorted(stories, key=score, reverse=True)
         selected = ordered[:max_stories]
-        reasons = {s.story_id: "Matched topic keywords" for s in selected}
+        reasons = {s.story_id: f"Matched weighted topic score ({score(s)})" for s in selected}
         return RankingResult(
             [s.story_id for s in selected],
             reasons,
             "Auto-selected from topical relevance.",
         )
+
+    def _parse_weighted_topics(self, topics_payload: str) -> list[tuple[str, int]]:
+        try:
+            parsed = yaml.safe_load(topics_payload)
+        except yaml.YAMLError:
+            return []
+        if not isinstance(parsed, dict):
+            return []
+
+        interests = parsed.get("interests")
+        if not isinstance(interests, list):
+            return []
+
+        weighted_topics: list[tuple[str, int]] = []
+        for entry in interests:
+            if not isinstance(entry, dict):
+                continue
+            topic = entry.get("topic")
+            score = entry.get("score")
+            if not isinstance(topic, str):
+                continue
+            if isinstance(score, bool) or not isinstance(score, int | float):
+                continue
+            normalized_topic = topic.strip().lower()
+            if not normalized_topic:
+                continue
+            weighted_topics.append((normalized_topic, int(score)))
+
+        return weighted_topics
 
     def _heuristic_summary(self, story: Story, word_budget: int) -> str:
         words = story.content.split()
