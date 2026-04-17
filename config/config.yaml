@@ -42,7 +42,7 @@ ai:
 smtp:
   host: smtp.fastmail.com
   port: 587
-  username: dfbp@fastmail.com
+  username: dfbp@fastmail.fm
   password_env_var: SMTP_PASSWORD
   from_address: dave@dfbr.co.uk
   to_address: amazon.co.uk_1nSvNA@kindle.com
