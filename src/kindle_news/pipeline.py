@@ -209,6 +209,7 @@ def run(
 
     output_epub = config.paths.output_dir / f"{publication_date}.epub"
     build_epub(digest, output_epub)
+    removed_cache_files = clear_cache(config.paths.cache_dir)
 
     email_delivery_status = "skipped"
     email_error = ""
@@ -256,7 +257,6 @@ def run(
         state.used_titles.add(normalize_title(story.title))
     save_state(config.paths.state_file, state)
 
-    removed_cache_files = clear_cache(config.paths.cache_dir)
     _write_json(
         config.paths.artifact_dir / "07_cache_cleanup.json",
         {
