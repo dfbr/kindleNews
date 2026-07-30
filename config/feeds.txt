@@ -219,3 +219,4 @@ https://www.askpython.com/feed
 #https://pragprog.com/rss.xml
 # stale (latest 2025-03-24)
 #https://stuartschechter.org/index.xml
+https://theconversation.com/uk/articles.atom
