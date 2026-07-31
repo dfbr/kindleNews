@@ -63,6 +63,10 @@ _NON_STORY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
 )
 
+_SHORT_STORY_WORD_THRESHOLD = 440
+_LONG_STORY_SUMMARY_WORD_TARGET = 400
+_AI_SUMMARY_NOTE = "Note: This story has been summarised by AI."
+
 
 def run(
     root: Path,
@@ -183,8 +187,17 @@ def run(
     summary_failures: list[dict[str, str]] = []
     for story, budget in zip(downloaded, budgets, strict=True):
         story.word_budget = budget
+        if _count_words(story.content) < _SHORT_STORY_WORD_THRESHOLD:
+            story.summary = story.content.strip()
+            summarized.append(story)
+            continue
         try:
-            story.summary = ai_client.summarize_story(story, persona, budget)
+            summary_text = ai_client.summarize_story(
+                story,
+                persona,
+                _LONG_STORY_SUMMARY_WORD_TARGET,
+            )
+            story.summary = f"{_AI_SUMMARY_NOTE}\n\n{summary_text}".strip()
         except RuntimeError as exc:
             logger.warning("Failed to summarize story %s: %s", story.story_id, exc)
             summary_failures.append(
@@ -446,3 +459,7 @@ def _allocate_word_budgets(stories: list[Story], total_words: int) -> list[int]:
             current += 1
 
     return budgets
+
+
+def _count_words(text: str) -> int:
+    return len(re.findall(r"\b[\w'-]+\b", text))
