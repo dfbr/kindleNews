@@ -13,9 +13,6 @@ paths:
 selection:
   lookback_days: 7
   max_stories: 15
-  min_pages: 10
-  max_pages: 20
-  words_per_page: 500
 
 dedupe:
   title_similarity_threshold: 0.9
@@ -38,7 +35,6 @@ ai:
   output_cost_per_1m: 1.6
   allow_heuristic_fallback: true
   ranking_prompt_file: config/prompts/ranking_prompt.txt
-  summary_prompt_file: config/prompts/summary_prompt.txt
 
 smtp:
   host: smtp.fastmail.com

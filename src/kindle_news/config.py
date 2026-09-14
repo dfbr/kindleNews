@@ -19,9 +19,6 @@ class PathsConfig:
 class SelectionConfig:
     lookback_days: int = 7
     max_stories: int = 15
-    min_pages: int = 10
-    max_pages: int = 20
-    words_per_page: int = 500
 
 
 @dataclass(slots=True)

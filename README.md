@@ -1,6 +1,6 @@
 # Kindle News
 
-Weekly AI-curated EPUB digest generated from RSS feeds and delivered by email.
+Weekly AI-selected EPUB digest generated from RSS feeds and delivered by email.
 
 ## Quick start
 

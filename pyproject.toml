@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kindle-news"
 version = "0.1.0"
-description = "Weekly AI-curated Kindle news digest"
+description = "Weekly AI-selected Kindle news digest"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
