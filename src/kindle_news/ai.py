@@ -55,31 +55,14 @@ Topic weighting rules:
 Persona:
 $persona
 
+Follow the persona's editorial guidelines when selecting stories and writing the editor_note.
+
 Reader topics:
 $topics_payload
 
 Stories:
 $stories_json
 """
-
-DEFAULT_SUMMARY_PROMPT_TEMPLATE = """Task: summarize one story for a weekly digest.
-Output contract:
-- Return exactly one JSON object and nothing else.
-- Do not use markdown, code fences, comments, or trailing commas.
-- JSON must start with '{' and end with '}'.
-- Use this schema exactly: {\"summary\": \"string\"}.
-- summary must be non-empty plain text.
-- Target length around $word_budget words.
-
-Persona:
-$persona
-
-Title: $title
-URL: $url
-Content:
-$content
-"""
-
 
 class AIResponseValidationError(RuntimeError):
     """Raised when an AI response cannot be parsed/validated after repair."""
@@ -98,12 +81,10 @@ class AIClient:
         config: AIConfig,
         cost_tracker: CostTracker,
         ranking_prompt_template: str = DEFAULT_RANKING_PROMPT_TEMPLATE,
-        summary_prompt_template: str = DEFAULT_SUMMARY_PROMPT_TEMPLATE,
     ) -> None:
         self.config = config
         self.cost_tracker = cost_tracker
         self.ranking_prompt_template = ranking_prompt_template
-        self.summary_prompt_template = summary_prompt_template
         api_key = os.getenv("OPENAI_API_KEY")
         self._client = OpenAI(api_key=api_key) if api_key else None
 
@@ -169,32 +150,6 @@ class AIClient:
             reasons=reasons,
             editor_note=editor_note,
         )
-
-    def summarize_story(self, story: Story, persona: str, word_budget: int) -> str:
-        if not self._client and self.config.allow_heuristic_fallback:
-            return self._heuristic_summary(story, word_budget)
-
-        self._require_client()
-        prompt = self._summary_prompt(story, persona, word_budget)
-        try:
-            parsed = self._json_response(
-                prompt,
-                validator=self._validate_summary_payload,
-                repair_prompt=(
-                    "Your previous response was invalid. Output only one JSON object. "
-                    "No markdown, no backticks, no prose. Use this exact schema: "
-                    '{"summary": "string"}. Ensure summary is non-empty plain text.'
-                ),
-            )
-        except AIResponseValidationError:
-            if not self.config.allow_heuristic_fallback:
-                raise
-            logger.warning(
-                "Falling back to heuristic summary for story_id=%s due to invalid AI response",
-                story.story_id,
-            )
-            return self._heuristic_summary(story, word_budget)
-        return str(parsed.get("summary", "")).strip()
 
     def _json_response(
         self,
@@ -283,15 +238,6 @@ class AIClient:
             stories_json=json.dumps(compact),
         )
 
-    def _summary_prompt(self, story: Story, persona: str, word_budget: int) -> str:
-        return Template(self.summary_prompt_template).safe_substitute(
-            word_budget=str(word_budget),
-            persona=persona,
-            title=story.title,
-            url=story.url,
-            content=story.content[:12000],
-        )
-
     def _validate_ranking_payload(self, parsed: dict[str, Any]) -> None:
         selected = parsed.get("selected")
         editor_note = parsed.get("editor_note")
@@ -311,11 +257,6 @@ class AIClient:
             reason = entry.get("reason", "")
             if not isinstance(reason, str):
                 raise ValueError("Each selected ranking entry reason must be a string")
-
-    def _validate_summary_payload(self, parsed: dict[str, Any]) -> None:
-        summary = parsed.get("summary")
-        if not isinstance(summary, str) or not summary.strip():
-            raise ValueError("AI summary payload must include a non-empty summary string")
 
     def _heuristic_rank(
         self,
@@ -382,7 +323,3 @@ class AIClient:
             weighted_topics.append((normalized_topic, int(score)))
 
         return weighted_topics
-
-    def _heuristic_summary(self, story: Story, word_budget: int) -> str:
-        words = story.content.split()
-        return " ".join(words[: max(80, word_budget)])

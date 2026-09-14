@@ -16,7 +16,6 @@ class Story:
     image_url: str | None = None
     image_credit: str | None = None
     relevance_reason: str = ""
-    word_budget: int = 0
 
 
 @dataclass(slots=True)

@@ -91,7 +91,6 @@ def _story_from_dict(raw: dict[str, object]) -> Story | None:
         image_url=str(raw["image_url"]) if raw.get("image_url") else None,
         image_credit=str(raw["image_credit"]) if raw.get("image_credit") else None,
         relevance_reason=str(raw.get("relevance_reason", "")),
-        word_budget=_to_int(raw.get("word_budget")),
     )
 
 
@@ -104,16 +103,3 @@ def _date_from_daily_file(path: Path) -> date | None:
         return datetime.strptime(stem[6:], "%Y-%m-%d").date()
     except ValueError:
         return None
-
-
-def _to_int(value: object) -> int:
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str):
-        try:
-            return int(value)
-        except ValueError:
-            return 0
-    return 0

@@ -68,6 +68,5 @@ def load_config(root: Path, config_path: Path | None = None) -> AppConfig:
     app.dedupe = DedupeConfig(**merged["dedupe"])
     app.ai = AIConfig(**merged["ai"])
     app.ai.ranking_prompt_file = Path(merged["ai"]["ranking_prompt_file"])
-    app.ai.summary_prompt_file = Path(merged["ai"]["summary_prompt_file"])
     app.smtp = SMTPConfig(**merged["smtp"])
     return app

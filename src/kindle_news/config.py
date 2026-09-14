@@ -51,7 +51,6 @@ class AIConfig:
     max_retries: int = 2
     repair_invalid_json_once: bool = True
     ranking_prompt_file: Path = Path("config/prompts/ranking_prompt.txt")
-    summary_prompt_file: Path = Path("config/prompts/summary_prompt.txt")
 
 
 @dataclass(slots=True)
