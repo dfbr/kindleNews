@@ -12,7 +12,6 @@ import yaml
 
 from .ai import (
     DEFAULT_RANKING_PROMPT_TEMPLATE,
-    DEFAULT_SUMMARY_PROMPT_TEMPLATE,
     AIClient,
 )
 from .cache_store import clear_cache, load_cached_stories, save_daily_cache
@@ -62,11 +61,6 @@ _NON_STORY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
 )
-
-_SHORT_STORY_WORD_THRESHOLD = 440
-_LONG_STORY_SUMMARY_WORD_TARGET = 400
-_AI_SUMMARY_NOTE = "Note: This story has been summarised by AI."
-
 
 def run(
     root: Path,
@@ -125,10 +119,7 @@ def run(
 
     persona = config.paths.editor_persona_file.read_text(encoding="utf-8")
     persona_overrides = _persona_publication_overrides(persona)
-    story_limit, target_pages, max_pages = _resolve_story_and_page_targets(
-        config,
-        persona_overrides,
-    )
+    story_limit = _resolve_story_limit(config, persona_overrides)
     topics_payload = yaml.safe_dump(
         yaml.safe_load(config.paths.reader_topics_file.read_text(encoding="utf-8")),
         sort_keys=False,
@@ -144,16 +135,10 @@ def run(
         config.ai.ranking_prompt_file,
         DEFAULT_RANKING_PROMPT_TEMPLATE,
     )
-    summary_prompt_template = _read_prompt_template(
-        root,
-        config.ai.summary_prompt_file,
-        DEFAULT_SUMMARY_PROMPT_TEMPLATE,
-    )
     ai_client = AIClient(
         config.ai,
         tracker,
         ranking_prompt_template=ranking_prompt_template,
-        summary_prompt_template=summary_prompt_template,
     )
     ranking = ai_client.rank_stories(fresh, persona, topics_payload, story_limit)
 
@@ -181,35 +166,10 @@ def run(
     _write_json(config.paths.artifact_dir / "04_downloaded_stories.json", downloaded)
     _write_json(config.paths.artifact_dir / "04_download_failures.json", failures)
 
-    total_words = target_pages * config.selection.words_per_page
-    budgets = _allocate_word_budgets(downloaded, total_words)
-    summarized: list[Story] = []
-    summary_failures: list[dict[str, str]] = []
-    for story, budget in zip(downloaded, budgets, strict=True):
-        story.word_budget = budget
-        if _count_words(story.content) < _SHORT_STORY_WORD_THRESHOLD:
-            story.summary = story.content.strip()
-            summarized.append(story)
-            continue
-        try:
-            summary_text = ai_client.summarize_story(
-                story,
-                persona,
-                _LONG_STORY_SUMMARY_WORD_TARGET,
-            )
-            story.summary = f"{_AI_SUMMARY_NOTE}\n\n{summary_text}".strip()
-        except RuntimeError as exc:
-            logger.warning("Failed to summarize story %s: %s", story.story_id, exc)
-            summary_failures.append(
-                {
-                    "story_id": story.story_id,
-                    "url": story.url,
-                    "reason": "summary_failed",
-                }
-            )
-            continue
-        summarized.append(story)
-    _write_json(config.paths.artifact_dir / "04_summary_failures.json", summary_failures)
+    selected_stories: list[Story] = []
+    for story in downloaded:
+        story.summary = story.content.strip()
+        selected_stories.append(story)
 
     publication_date = datetime.now(UTC).date().isoformat()
     title = f"Weekly News Digest {publication_date}"
@@ -217,7 +177,7 @@ def run(
         publication_date=publication_date,
         title=title,
         editor_note=ranking.editor_note,
-        stories=summarized,
+        stories=selected_stories,
     )
 
     output_epub = config.paths.output_dir / f"{publication_date}.epub"
@@ -239,15 +199,12 @@ def run(
         {
             "publication_date": publication_date,
             "title": title,
-            "target_pages": target_pages,
-            "max_pages": max_pages,
             "raw_story_count": len(raw_stories),
             "deduped_story_count": len(deduped),
             "fresh_story_count": len(fresh),
             "non_story_filtered_count": len(non_story_filtered),
             "picked_story_count": len(picked),
-            "story_count": len(summarized),
-            "summary_failure_count": len(summary_failures),
+            "story_count": len(selected_stories),
             "email_delivery_status": email_delivery_status,
             "email_error": email_error,
             "cost_usd": round(tracker.total_cost_usd, 6),
@@ -264,7 +221,7 @@ def run(
         },
     )
 
-    for story in summarized:
+    for story in selected_stories:
         state.used_urls.add(story.url)
         state.used_titles.add(normalize_title(story.title))
     save_state(config.paths.state_file, state)
@@ -353,25 +310,12 @@ def _persona_publication_overrides(persona: str) -> dict[str, Any]:
     return publication if isinstance(publication, dict) else {}
 
 
-def _resolve_story_and_page_targets(
-    config: Any,
-    publication_overrides: dict[str, Any],
-) -> tuple[int, int, int]:
+def _resolve_story_limit(config: Any, publication_overrides: dict[str, Any]) -> int:
     target_stories = _coerce_positive_int(
         publication_overrides.get("target_stories"),
         config.selection.max_stories,
     )
-    max_pages = _coerce_positive_int(
-        publication_overrides.get("max_pages"),
-        config.selection.max_pages,
-    )
-    target_pages = _coerce_positive_int(publication_overrides.get("target_pages"), max_pages)
-
-    min_pages = max(1, config.selection.min_pages)
-    max_pages = max(min_pages, max_pages)
-    target_pages = max(min_pages, min(target_pages, max_pages))
-    story_limit = max(1, target_stories)
-    return story_limit, target_pages, max_pages
+    return max(1, target_stories)
 
 
 def _coerce_positive_int(value: Any, default: int) -> int:
@@ -421,45 +365,3 @@ def _exclude_non_story_candidates(stories: list[Story]) -> tuple[list[Story], li
         kept.append(story)
 
     return kept, filtered
-
-
-def _allocate_word_budgets(stories: list[Story], total_words: int) -> list[int]:
-    if not stories:
-        return []
-
-    count = len(stories)
-    if total_words <= 0:
-        return [0] * count
-
-    floor = min(100, max(40, total_words // count))
-    if count == 1:
-        return [max(floor, total_words)]
-
-    span = 0.30
-    weights = [1.15 - span * (idx / (count - 1)) for idx in range(count)]
-    total_weight = sum(weights)
-    budgets = [max(floor, int(total_words * weight / total_weight)) for weight in weights]
-
-    current = sum(budgets)
-    while current > total_words:
-        changed = False
-        for idx in sorted(range(count), key=lambda item: budgets[item], reverse=True):
-            if budgets[idx] > floor and current > total_words:
-                budgets[idx] -= 1
-                current -= 1
-                changed = True
-        if not changed:
-            break
-
-    while current < total_words:
-        for idx in sorted(range(count), key=lambda item: budgets[item], reverse=True):
-            if current >= total_words:
-                break
-            budgets[idx] += 1
-            current += 1
-
-    return budgets
-
-
-def _count_words(text: str) -> int:
-    return len(re.findall(r"\b[\w'-]+\b", text))

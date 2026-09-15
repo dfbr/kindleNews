@@ -19,9 +19,6 @@ class PathsConfig:
 class SelectionConfig:
     lookback_days: int = 7
     max_stories: int = 15
-    min_pages: int = 10
-    max_pages: int = 20
-    words_per_page: int = 500
 
 
 @dataclass(slots=True)
@@ -51,7 +48,6 @@ class AIConfig:
     max_retries: int = 2
     repair_invalid_json_once: bool = True
     ranking_prompt_file: Path = Path("config/prompts/ranking_prompt.txt")
-    summary_prompt_file: Path = Path("config/prompts/summary_prompt.txt")
 
 
 @dataclass(slots=True)

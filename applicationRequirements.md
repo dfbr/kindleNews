@@ -2,11 +2,11 @@
 
 ## Overview
 
-This application will get a week's worth of news and summarise it based on a reader topics file using an AI provider (probably openAI).
+This application will get a week's worth of news and compile it into an ebook based on a reader topics file using an AI provider (probably openAI).
 
-The AI will look through the stories from the last week gathered from provided RSS feeds. It will compare the stories with the reader topics file and pick the 15 (configurable) most relevant stories, summarising them so that they fit within the space constraints. Photos from the articles should be included so that there is visual interest as well.
+The AI will look through the stories from the last week gathered from provided RSS feeds. It will compare the stories with the reader topics file and the editor persona, then pick the 15 (configurable) most relevant stories. Those selected stories should then be included from the original source in full. Photos from the articles should be included so that there is visual interest as well.
 
-The resulting summary will be a maximum 10 pages (configurable) from which an ebook will be created and then emailed to my kindle (SMTP details for an email server will be provided)
+The resulting ebook will be created and then emailed to my kindle (SMTP details for an email server will be provided)
 
 The reader topics file should have a way of marking things that are of interest and that are not of interest (for example, a score from -100 to +100 along with the topic). While the reader topics should be taken into account, the resulting ebook should also be a balanced review of the retreived news stories of the week.
 
@@ -25,13 +25,13 @@ A file will be provided with the persona of the editor and the editorial outlook
 
 The file is expected to be either plaintext or plaintext with yaml frontmatter for specific configuration (length of publication, number of articles etc).
 
-The editor persona file will also define what constitutes a balanced review and how page budgeting should be handled.
+The editor persona file will also define what constitutes a balanced review and the editorial guidelines the AI should follow when selecting stories.
 
 ## RSS feeds
 
 These will be in a text file, one rss feed per line. They should be retreived when the process is run and if the feed doesn't go back for a full week paging should be implemented.
 
-From the summaries in the feeds, the AI should pick the most relevant stories. These should then be downloaded in full for the AI to summarise.
+From the summaries in the feeds, the AI should pick the most relevant stories. These should then be downloaded and included in full in the ebook.
 
 Expect in the region of 10-20 RSS feeds but you should be flexible on the number of feeds.
 
@@ -47,25 +47,24 @@ There should be state included to avoid duplicate stories from week to week (unl
 
 OpenAI should be used with a cost effective model.
 The AI should be given the persona file of the editor, the reader topics file, and the list of stories from the various RSS summaries. From this it should pick the stories that are most relevant for the rounded weekly summary.
-With the list of stories that it picks, they should then be downloaded and each should be summarised by the AI to an appropriate length based on the space constraints of the weekly summary.
-Not all stories should be summarised to the same length to provide variety and interest for the reader.
+With the list of stories that it picks, they should then be downloaded and included in full in the weekly ebook.
 
 The total AI cost for a weekly run should remain under 1 USD.
 
 ## Images
 
-Included images should use the native quality. Size should be amended to fit in with length constraints
+Included images should use the native quality and be rendered sensibly within the ebook layout.
 
 Licensing constraints for images do not need to be considered for this personal-use application.
 
 ## Output ebook
 
-This will be an ebook of the summary and should be generated as an epub suitable for sending over whispernet to a kindle device unless a later implementation constraint requires a different Kindle-compatible format. It should include a cover image that represents the most interesting photo image of the week.
+This will be an ebook of the selected stories and should be generated as an epub suitable for sending over whispernet to a kindle device unless a later implementation constraint requires a different Kindle-compatible format. It should include a cover image that represents the most interesting photo image of the week.
 The cover should have a title including the date of publication.
 
 Images should have credits included. Default layout should be flowing around the pictures if possible.
 
-Page budgeting should assume approximately 500 words per page, with the publication usually expected to be between 10 and 20 pages as defined by the editor persona file.
+The editor persona may still define the desired number of stories, but the selected articles should be included in full rather than trimmed to a page budget.
 
 ## Scheduling
 
@@ -99,7 +98,7 @@ The process should be run as a github action on a schedule. Language and approac
 The MVP is complete when all of the following are true:
 - A scheduled GitHub Action runs weekly in GMT and finishes before the Monday 5am target.
 - The workflow reads config from the config folder defaults unless overridden in config/config.yaml.
-- The workflow retrieves feed entries, deduplicates stories, selects and summarises stories, generates an epub, and sends it by SMTP.
+- The workflow retrieves feed entries, deduplicates stories, selects stories, includes their original text in full, generates an epub, and sends it by SMTP.
 - Story download failures are logged and skipped without failing the full run.
 - The weekly epub is saved to the repository using the publication date as the filename.
 - Required artifacts are uploaded for observability.
@@ -128,7 +127,6 @@ At minimum, include tests for:
 - Feed ingestion and duplicate removal behavior
 - Story selection pipeline input/output shape
 - Story download failure handling (log and continue)
-- Page budgeting behavior based on configured constraints
 - EPUB creation and expected output filename generation
 
 ### CI and quality gates
@@ -154,7 +152,7 @@ Pull requests should only be merged when all required checks pass:
 
 ### Prompt and output contracts
 
-- Use structured prompts with explicit expected JSON output schemas for story ranking and summary generation steps.
+- Use structured prompts with explicit expected JSON output schemas for story ranking.
 - Validate AI outputs before downstream processing.
 - If output validation fails, retry with a repair prompt once before failing that specific item.
 
@@ -174,7 +172,7 @@ Pull requests should only be merged when all required checks pass:
 The work should be delivered in these milestones:
 1. Project scaffolding, config loading, and validation.
 2. Feed ingestion, normalization, dedupe, and state persistence.
-3. AI-driven ranking and summarization pipeline with budget controls.
+3. AI-driven ranking and full-text selection pipeline with budget controls.
 4. EPUB generation with images and cover.
 5. Email delivery, scheduled workflow, and observability artifacts.
 
@@ -197,7 +195,7 @@ Use this checklist to approve outsourced delivery. Every item should be marked P
 | --- | --- | --- | --- |
 | Milestone 1: scaffold and config | Project structure created (src/, tests/, config/, output/, .github/workflows/). Config loads from config/config.yaml with documented overrides. | Repo tree, sample config files, test results for config loading. | [ ] Pass / [ ] Fail |
 | Milestone 2: ingest and dedupe | RSS ingestion works for 10-20 feeds, stories are normalized, duplicates removed, and state file is read/written. | Test report for dedupe/state behavior, example artifact showing deduped list. | [ ] Pass / [ ] Fail |
-| Milestone 3: AI pipeline and budget | AI ranking and summarization run with schema-validated outputs. Budget guardrail enforces under 1 USD and fails clearly when exceeded. | Prompt/output schema tests, run logs with estimated/actual spend, failure example for budget exceed. | [ ] Pass / [ ] Fail |
+| Milestone 3: AI pipeline and budget | AI ranking runs with schema-validated outputs, and selected stories are included in full after download. Budget guardrail enforces under 1 USD and fails clearly when exceeded. | Prompt/output schema tests, run logs with estimated/actual spend, failure example for budget exceed. | [ ] Pass / [ ] Fail |
 | Milestone 4: epub generation | EPUB generated with dated filename (YYYY-MM-DD.epub), includes cover/title/date, and handles image embedding/credits where available. | Generated EPUB artifact and automated test for filename/output path. | [ ] Pass / [ ] Fail |
 | Milestone 5: delivery and observability | Weekly schedule configured in GMT, SMTP send works with retries, required artifacts uploaded, and epub persisted to repo history. | Workflow YAML, successful workflow run link/logs, artifact listing, commit showing persisted epub. | [ ] Pass / [ ] Fail |
 | Reliability and failures | Feed/story failures log and continue; unrecoverable AI/SMTP/EPUB failures stop run with clear messages. | Logs from simulated failure tests and expected run outcomes. | [ ] Pass / [ ] Fail |
